@@ -66,4 +66,31 @@ fn test_system_info_fields() {
         info.processes_count > 0,
         "Should have at least one process running"
     );
+
+    // Network details should be present (though may be None)
+    // Just check the struct exists
+    let _ = &info.network_details;
+}
+
+#[test]
+fn test_network_details() {
+    let info = SystemInfo::collect();
+
+    // Network details should be present
+    let network_details = &info.network_details;
+
+    // Local IP might be available, public IP might not be in restricted environments
+    // Just verify we can access these fields without panic
+    let _ = network_details.local_ip.as_ref();
+    let _ = network_details.public_ip.as_ref();
+    let _ = network_details.bandwidth_mbps;
+}
+
+#[test]
+fn test_get_local_ip() {
+    // Test that the function doesn't panic
+    let result = SystemInfo::get_local_ip();
+    // In most environments, a local IP should be available
+    // but we can't guarantee it in all test environments
+    let _ = result;
 }
