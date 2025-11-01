@@ -93,7 +93,7 @@ impl SystemInfo {
                 interface_name: interface_name.clone(),
                 received_bytes: data.received(),
                 transmitted_bytes: data.transmitted(),
-                ip_address: None, // IP addresses per interface would require additional parsing
+                ip_address: None, // Interface-specific IPs not provided by sysinfo crate
             })
             .collect();
 
@@ -190,9 +190,9 @@ impl SystemInfo {
 
     /// Benchmark network bandwidth
     pub fn benchmark_bandwidth() -> Option<f64> {
-        // Download a small file from a fast CDN to measure bandwidth
+        // Download a test file from a fast CDN to measure bandwidth
         let test_urls = [
-            "https://speed.cloudflare.com/__down?bytes=1000000", // 1MB test
+            "https://speed.cloudflare.com/__down?bytes=1000000", // ~976 KB test
         ];
 
         for url in &test_urls {
