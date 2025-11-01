@@ -190,7 +190,7 @@ impl App {
 
     fn render_overview(&self, f: &mut Frame, area: ratatui::layout::Rect) {
         let info = &self.system_info;
-        let items = vec![
+        let mut items = vec![
             format!("🖥️  Hostname: {}", info.hostname),
             format!("💻 OS: {} {}", info.os_name, info.os_version),
             format!("🔧 Kernel: {}", info.kernel_version),
@@ -220,8 +220,17 @@ impl App {
             String::new(),
             format!("💿 Disks: {}", info.disks.len()),
             format!("🌐 Network Interfaces: {}", info.networks.len()),
-            format!("📋 Running Processes: {}", info.processes_count),
         ];
+
+        // Add network details if available
+        if let Some(local_ip) = &info.network_details.local_ip {
+            items.push(format!("🏠 Local IP: {}", local_ip));
+        }
+        if let Some(public_ip) = &info.network_details.public_ip {
+            items.push(format!("🌍 Public IP: {}", public_ip));
+        }
+
+        items.push(format!("📋 Running Processes: {}", info.processes_count));
 
         let list_items: Vec<ListItem> = items
             .iter()
@@ -391,21 +400,43 @@ impl App {
     fn render_network(&self, f: &mut Frame, area: ratatui::layout::Rect) {
         let info = &self.system_info;
 
-        let mut items = vec!["Network Interfaces:".to_string(), String::new()];
+        let mut items = vec!["═══ NETWORK DETAILS ═══".to_string()];
+
+        // Add network details
+        if let Some(local_ip) = &info.network_details.local_ip {
+            items.push(format!("🏠 Local IP:    {}", local_ip));
+        } else {
+            items.push("🏠 Local IP:    Not available".to_string());
+        }
+
+        if let Some(public_ip) = &info.network_details.public_ip {
+            items.push(format!("🌍 Public IP:   {}", public_ip));
+        } else {
+            items.push("🌍 Public IP:   Not available".to_string());
+        }
+
+        if let Some(bandwidth) = info.network_details.bandwidth_mbps {
+            items.push(format!("⚡ Bandwidth:   {:.2} Mbps", bandwidth));
+        } else {
+            items.push("⚡ Bandwidth:   Not available".to_string());
+        }
+
+        items.push(String::new());
+        items.push("═══ NETWORK INTERFACES ═══".to_string());
+        items.push(String::new());
 
         for (idx, network) in info.networks.iter().enumerate() {
-            items.push(format!("═══ Interface {} ═══", idx + 1));
-            items.push(format!("Name:       {}", network.interface_name));
+            items.push(format!("Interface {}: {}", idx + 1, network.interface_name));
             items.push(format!(
-                "Received:   {}",
+                "  Received:    {}",
                 SystemInfo::format_bytes(network.received_bytes)
             ));
             items.push(format!(
-                "Transmitted: {}",
+                "  Transmitted: {}",
                 SystemInfo::format_bytes(network.transmitted_bytes)
             ));
             items.push(format!(
-                "Total:      {}",
+                "  Total:       {}",
                 SystemInfo::format_bytes(network.received_bytes + network.transmitted_bytes)
             ));
             items.push(String::new());
