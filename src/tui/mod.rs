@@ -82,10 +82,9 @@ impl App {
 
             if event::poll(Duration::from_millis(100))? {
                 if let Event::Key(key) = event::read()? {
-                    if key.kind == KeyEventKind::Press
-                        && self.handle_input(key.code)? {
-                            break;
-                        }
+                    if key.kind == KeyEventKind::Press && self.handle_input(key.code)? {
+                        break;
+                    }
                 }
             }
         }
@@ -97,7 +96,8 @@ impl App {
         match key {
             KeyCode::Char('q') => return Ok(true),
             KeyCode::Char('h') => {
-                self.status_message = "Keys: q=quit, r=refresh, 1=overview, 2=memory, 3=disks, 4=network".to_string();
+                self.status_message =
+                    "Keys: q=quit, r=refresh, 1=overview, 2=memory, 3=disks, 4=network".to_string();
             }
             KeyCode::Char('r') => {
                 self.refresh();
@@ -160,7 +160,11 @@ impl App {
             .collect();
 
         let title = Paragraph::new(format!("🖥️  System Index - {}", tabs_text.join(" | ")))
-            .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+            .style(
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )
             .alignment(Alignment::Center)
             .block(Block::default().borders(Borders::ALL));
         f.render_widget(title, chunks[0]);
@@ -192,11 +196,23 @@ impl App {
             format!("⚙️  CPU: {}", info.cpu_brand),
             format!("📊 CPU Cores: {}", info.cpu_count),
             String::new(),
-            format!("💾 Total Memory: {}", SystemInfo::format_bytes(info.total_memory)),
-            format!("📈 Used Memory: {}", SystemInfo::format_bytes(info.used_memory)),
-            format!("📉 Free Memory: {}", SystemInfo::format_bytes(info.total_memory - info.used_memory)),
+            format!(
+                "💾 Total Memory: {}",
+                SystemInfo::format_bytes(info.total_memory)
+            ),
+            format!(
+                "📈 Used Memory: {}",
+                SystemInfo::format_bytes(info.used_memory)
+            ),
+            format!(
+                "📉 Free Memory: {}",
+                SystemInfo::format_bytes(info.total_memory - info.used_memory)
+            ),
             String::new(),
-            format!("🔄 Total Swap: {}", SystemInfo::format_bytes(info.total_swap)),
+            format!(
+                "🔄 Total Swap: {}",
+                SystemInfo::format_bytes(info.total_swap)
+            ),
             format!("📊 Used Swap: {}", SystemInfo::format_bytes(info.used_swap)),
             String::new(),
             format!("💿 Disks: {}", info.disks.len()),
@@ -210,7 +226,11 @@ impl App {
             .collect();
 
         let list = List::new(list_items)
-            .block(Block::default().borders(Borders::ALL).title("System Overview"))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("System Overview"),
+            )
             .style(Style::default().fg(Color::White));
 
         f.render_widget(list, area);
@@ -218,7 +238,7 @@ impl App {
 
     fn render_memory(&self, f: &mut Frame, area: ratatui::layout::Rect) {
         let info = &self.system_info;
-        
+
         let total_mem = info.total_memory;
         let used_mem = info.used_memory;
         let free_mem = total_mem - used_mem;
@@ -240,18 +260,28 @@ impl App {
         let items = vec![
             "═══ RAM MEMORY ═══".to_string(),
             format!("Total:     {}", SystemInfo::format_bytes(total_mem)),
-            format!("Used:      {} ({}%)", SystemInfo::format_bytes(used_mem), mem_usage_percent),
+            format!(
+                "Used:      {} ({}%)",
+                SystemInfo::format_bytes(used_mem),
+                mem_usage_percent
+            ),
             format!("Free:      {}", SystemInfo::format_bytes(free_mem)),
-            format!("Usage Bar: [{}{}]", 
+            format!(
+                "Usage Bar: [{}{}]",
                 "█".repeat((mem_usage_percent / 2) as usize),
                 "░".repeat(50 - (mem_usage_percent / 2) as usize)
             ),
             String::new(),
             "═══ SWAP MEMORY ═══".to_string(),
             format!("Total:     {}", SystemInfo::format_bytes(total_swap)),
-            format!("Used:      {} ({}%)", SystemInfo::format_bytes(used_swap), swap_usage_percent),
+            format!(
+                "Used:      {} ({}%)",
+                SystemInfo::format_bytes(used_swap),
+                swap_usage_percent
+            ),
             format!("Free:      {}", SystemInfo::format_bytes(free_swap)),
-            format!("Usage Bar: [{}{}]",
+            format!(
+                "Usage Bar: [{}{}]",
                 "█".repeat((swap_usage_percent / 2) as usize),
                 "░".repeat(50 - (swap_usage_percent / 2) as usize)
             ),
@@ -261,8 +291,11 @@ impl App {
             .iter()
             .map(|item| {
                 if item.starts_with("═══") {
-                    ListItem::new(item.as_str())
-                        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+                    ListItem::new(item.as_str()).style(
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    )
                 } else {
                     ListItem::new(item.as_str())
                 }
@@ -270,7 +303,11 @@ impl App {
             .collect();
 
         let list = List::new(list_items)
-            .block(Block::default().borders(Borders::ALL).title("Memory Details"))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Memory Details"),
+            )
             .style(Style::default().fg(Color::White));
 
         f.render_widget(list, area);
@@ -278,9 +315,9 @@ impl App {
 
     fn render_disks(&self, f: &mut Frame, area: ratatui::layout::Rect) {
         let info = &self.system_info;
-        
+
         let mut items = vec!["Mounted Disks:".to_string(), String::new()];
-        
+
         for (idx, disk) in info.disks.iter().enumerate() {
             let used_space = disk.total_space - disk.available_space;
             let usage_percent = if disk.total_space > 0 {
@@ -293,10 +330,21 @@ impl App {
             items.push(format!("Name:       {}", disk.name));
             items.push(format!("Mount:      {}", disk.mount_point));
             items.push(format!("Filesystem: {}", disk.file_system));
-            items.push(format!("Total:      {}", SystemInfo::format_bytes(disk.total_space)));
-            items.push(format!("Used:       {} ({}%)", SystemInfo::format_bytes(used_space), usage_percent));
-            items.push(format!("Available:  {}", SystemInfo::format_bytes(disk.available_space)));
-            items.push(format!("Usage Bar:  [{}{}]",
+            items.push(format!(
+                "Total:      {}",
+                SystemInfo::format_bytes(disk.total_space)
+            ));
+            items.push(format!(
+                "Used:       {} ({}%)",
+                SystemInfo::format_bytes(used_space),
+                usage_percent
+            ));
+            items.push(format!(
+                "Available:  {}",
+                SystemInfo::format_bytes(disk.available_space)
+            ));
+            items.push(format!(
+                "Usage Bar:  [{}{}]",
                 "█".repeat((usage_percent / 2) as usize),
                 "░".repeat(50 - (usage_percent / 2) as usize)
             ));
@@ -311,8 +359,11 @@ impl App {
             .iter()
             .map(|item| {
                 if item.starts_with("═══") {
-                    ListItem::new(item.as_str())
-                        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+                    ListItem::new(item.as_str()).style(
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    )
                 } else {
                     ListItem::new(item.as_str())
                 }
@@ -320,7 +371,11 @@ impl App {
             .collect();
 
         let list = List::new(list_items)
-            .block(Block::default().borders(Borders::ALL).title("Disk Information"))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Disk Information"),
+            )
             .style(Style::default().fg(Color::White));
 
         f.render_widget(list, area);
@@ -328,17 +383,24 @@ impl App {
 
     fn render_network(&self, f: &mut Frame, area: ratatui::layout::Rect) {
         let info = &self.system_info;
-        
+
         let mut items = vec!["Network Interfaces:".to_string(), String::new()];
-        
+
         for (idx, network) in info.networks.iter().enumerate() {
             items.push(format!("═══ Interface {} ═══", idx + 1));
             items.push(format!("Name:       {}", network.interface_name));
-            items.push(format!("Received:   {}", SystemInfo::format_bytes(network.received_bytes)));
-            items.push(format!("Transmitted: {}", SystemInfo::format_bytes(network.transmitted_bytes)));
-            items.push(format!("Total:      {}", SystemInfo::format_bytes(
-                network.received_bytes + network.transmitted_bytes
-            )));
+            items.push(format!(
+                "Received:   {}",
+                SystemInfo::format_bytes(network.received_bytes)
+            ));
+            items.push(format!(
+                "Transmitted: {}",
+                SystemInfo::format_bytes(network.transmitted_bytes)
+            ));
+            items.push(format!(
+                "Total:      {}",
+                SystemInfo::format_bytes(network.received_bytes + network.transmitted_bytes)
+            ));
             items.push(String::new());
         }
 
@@ -350,8 +412,11 @@ impl App {
             .iter()
             .map(|item| {
                 if item.starts_with("═══") {
-                    ListItem::new(item.as_str())
-                        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+                    ListItem::new(item.as_str()).style(
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    )
                 } else {
                     ListItem::new(item.as_str())
                 }
@@ -359,7 +424,11 @@ impl App {
             .collect();
 
         let list = List::new(list_items)
-            .block(Block::default().borders(Borders::ALL).title("Network Information"))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Network Information"),
+            )
             .style(Style::default().fg(Color::White));
 
         f.render_widget(list, area);

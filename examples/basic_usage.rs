@@ -22,9 +22,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Display memory information
     println!("Memory Information:");
-    println!("  Total RAM: {}", SystemInfo::format_bytes(info.total_memory));
+    println!(
+        "  Total RAM: {}",
+        SystemInfo::format_bytes(info.total_memory)
+    );
     println!("  Used RAM: {}", SystemInfo::format_bytes(info.used_memory));
-    println!("  Free RAM: {}", SystemInfo::format_bytes(info.total_memory - info.used_memory));
+    println!(
+        "  Free RAM: {}",
+        SystemInfo::format_bytes(info.total_memory - info.used_memory)
+    );
     println!();
 
     // Display disk information
@@ -34,7 +40,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("    Name: {}", disk.name);
         println!("    Mount: {}", disk.mount_point);
         println!("    Total: {}", SystemInfo::format_bytes(disk.total_space));
-        println!("    Available: {}", SystemInfo::format_bytes(disk.available_space));
+        println!(
+            "    Available: {}",
+            SystemInfo::format_bytes(disk.available_space)
+        );
     }
     println!();
 
@@ -43,8 +52,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (idx, network) in info.networks.iter().enumerate() {
         println!("  Interface {}:", idx + 1);
         println!("    Name: {}", network.interface_name);
-        println!("    Received: {}", SystemInfo::format_bytes(network.received_bytes));
-        println!("    Transmitted: {}", SystemInfo::format_bytes(network.transmitted_bytes));
+        println!(
+            "    Received: {}",
+            SystemInfo::format_bytes(network.received_bytes)
+        );
+        println!(
+            "    Transmitted: {}",
+            SystemInfo::format_bytes(network.transmitted_bytes)
+        );
     }
 
     Ok(())

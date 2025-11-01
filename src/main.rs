@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn print_overview() {
     let info = SystemInfo::collect();
-    
+
     println!("╔═══════════════════════════════════════════════════════╗");
     println!("║              SYSTEM OVERVIEW                          ║");
     println!("╚═══════════════════════════════════════════════════════╝");
@@ -71,13 +71,22 @@ fn print_overview() {
     println!("🖥️  Hostname:        {}", info.hostname);
     println!("💻 Operating System: {} {}", info.os_name, info.os_version);
     println!("🔧 Kernel Version:   {}", info.kernel_version);
-    println!("⏰ System Uptime:    {}", SystemInfo::format_uptime(info.uptime));
+    println!(
+        "⏰ System Uptime:    {}",
+        SystemInfo::format_uptime(info.uptime)
+    );
     println!();
     println!("⚙️  CPU:             {}", info.cpu_brand);
     println!("📊 CPU Cores:        {}", info.cpu_count);
     println!();
-    println!("💾 Total Memory:     {}", SystemInfo::format_bytes(info.total_memory));
-    println!("📈 Used Memory:      {}", SystemInfo::format_bytes(info.used_memory));
+    println!(
+        "💾 Total Memory:     {}",
+        SystemInfo::format_bytes(info.total_memory)
+    );
+    println!(
+        "📈 Used Memory:      {}",
+        SystemInfo::format_bytes(info.used_memory)
+    );
     println!();
     println!("💿 Mounted Disks:    {}", info.disks.len());
     println!("🌐 Network Interfaces: {}", info.networks.len());
@@ -86,7 +95,7 @@ fn print_overview() {
 
 fn print_cpu_info() {
     let info = SystemInfo::collect();
-    
+
     println!("╔═══════════════════════════════════════════════════════╗");
     println!("║              CPU INFORMATION                          ║");
     println!("╚═══════════════════════════════════════════════════════╝");
@@ -97,7 +106,7 @@ fn print_cpu_info() {
 
 fn print_memory_info() {
     let info = SystemInfo::collect();
-    
+
     let total_mem = info.total_memory;
     let used_mem = info.used_memory;
     let free_mem = total_mem - used_mem;
@@ -122,23 +131,31 @@ fn print_memory_info() {
     println!();
     println!("═══ RAM MEMORY ═══");
     println!("Total Memory:    {}", SystemInfo::format_bytes(total_mem));
-    println!("Used Memory:     {} ({:.2}%)", SystemInfo::format_bytes(used_mem), mem_usage_percent);
+    println!(
+        "Used Memory:     {} ({:.2}%)",
+        SystemInfo::format_bytes(used_mem),
+        mem_usage_percent
+    );
     println!("Free Memory:     {}", SystemInfo::format_bytes(free_mem));
     println!();
     println!("═══ SWAP MEMORY ═══");
     println!("Total Swap:      {}", SystemInfo::format_bytes(total_swap));
-    println!("Used Swap:       {} ({:.2}%)", SystemInfo::format_bytes(used_swap), swap_usage_percent);
+    println!(
+        "Used Swap:       {} ({:.2}%)",
+        SystemInfo::format_bytes(used_swap),
+        swap_usage_percent
+    );
     println!("Free Swap:       {}", SystemInfo::format_bytes(free_swap));
 }
 
 fn print_disk_info() {
     let info = SystemInfo::collect();
-    
+
     println!("╔═══════════════════════════════════════════════════════╗");
     println!("║              DISK INFORMATION                         ║");
     println!("╚═══════════════════════════════════════════════════════╝");
     println!();
-    
+
     if info.disks.is_empty() {
         println!("No disk information available.");
         return;
@@ -156,21 +173,31 @@ fn print_disk_info() {
         println!("Name:           {}", disk.name);
         println!("Mount Point:    {}", disk.mount_point);
         println!("File System:    {}", disk.file_system);
-        println!("Total Space:    {}", SystemInfo::format_bytes(disk.total_space));
-        println!("Used Space:     {} ({:.2}%)", SystemInfo::format_bytes(used_space), usage_percent);
-        println!("Available Space: {}", SystemInfo::format_bytes(disk.available_space));
+        println!(
+            "Total Space:    {}",
+            SystemInfo::format_bytes(disk.total_space)
+        );
+        println!(
+            "Used Space:     {} ({:.2}%)",
+            SystemInfo::format_bytes(used_space),
+            usage_percent
+        );
+        println!(
+            "Available Space: {}",
+            SystemInfo::format_bytes(disk.available_space)
+        );
         println!();
     }
 }
 
 fn print_network_info() {
     let info = SystemInfo::collect();
-    
+
     println!("╔═══════════════════════════════════════════════════════╗");
     println!("║              NETWORK INFORMATION                      ║");
     println!("╚═══════════════════════════════════════════════════════╝");
     println!();
-    
+
     if info.networks.is_empty() {
         println!("No network information available.");
         return;
@@ -179,11 +206,18 @@ fn print_network_info() {
     for (idx, network) in info.networks.iter().enumerate() {
         println!("═══ Interface {} ═══", idx + 1);
         println!("Name:           {}", network.interface_name);
-        println!("Received:       {}", SystemInfo::format_bytes(network.received_bytes));
-        println!("Transmitted:    {}", SystemInfo::format_bytes(network.transmitted_bytes));
-        println!("Total:          {}", SystemInfo::format_bytes(
-            network.received_bytes + network.transmitted_bytes
-        ));
+        println!(
+            "Received:       {}",
+            SystemInfo::format_bytes(network.received_bytes)
+        );
+        println!(
+            "Transmitted:    {}",
+            SystemInfo::format_bytes(network.transmitted_bytes)
+        );
+        println!(
+            "Total:          {}",
+            SystemInfo::format_bytes(network.received_bytes + network.transmitted_bytes)
+        );
         println!();
     }
 }

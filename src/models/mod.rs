@@ -40,10 +40,10 @@ impl SystemInfo {
     /// Collect current system information
     pub fn collect() -> Self {
         let mut sys = System::new_all();
-        
+
         // Refresh system information
         sys.refresh_all();
-        
+
         let _components = Components::new_with_refreshed_list();
         let disks = Disks::new_with_refreshed_list();
         let networks = Networks::new_with_refreshed_list();
@@ -54,7 +54,9 @@ impl SystemInfo {
         let hostname = System::host_name().unwrap_or_else(|| "Unknown".to_string());
 
         let cpu_count = sys.cpus().len();
-        let cpu_brand = sys.cpus().first()
+        let cpu_brand = sys
+            .cpus()
+            .first()
             .map(|cpu| cpu.brand().to_string())
             .unwrap_or_else(|| "Unknown".to_string());
 
@@ -144,7 +146,7 @@ mod tests {
     #[test]
     fn test_collect_system_info() {
         let info = SystemInfo::collect();
-        
+
         // Basic assertions to ensure data is collected
         assert!(!info.os_name.is_empty());
         assert!(!info.hostname.is_empty());
