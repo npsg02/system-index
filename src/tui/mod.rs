@@ -15,6 +15,9 @@ use ratatui::{
 use std::io;
 use std::time::{Duration, Instant};
 
+/// Width of progress bars in characters
+const PROGRESS_BAR_WIDTH: usize = 50;
+
 /// Application state
 pub struct App {
     system_info: SystemInfo,
@@ -267,9 +270,8 @@ impl App {
             ),
             format!("Free:      {}", SystemInfo::format_bytes(free_mem)),
             format!(
-                "Usage Bar: [{}{}]",
-                "█".repeat((mem_usage_percent / 2) as usize),
-                "░".repeat(50 - (mem_usage_percent / 2) as usize)
+                "Usage Bar: [{}]",
+                Self::create_progress_bar(mem_usage_percent)
             ),
             String::new(),
             "═══ SWAP MEMORY ═══".to_string(),
@@ -281,9 +283,8 @@ impl App {
             ),
             format!("Free:      {}", SystemInfo::format_bytes(free_swap)),
             format!(
-                "Usage Bar: [{}{}]",
-                "█".repeat((swap_usage_percent / 2) as usize),
-                "░".repeat(50 - (swap_usage_percent / 2) as usize)
+                "Usage Bar: [{}]",
+                Self::create_progress_bar(swap_usage_percent)
             ),
         ];
 
@@ -311,6 +312,13 @@ impl App {
             .style(Style::default().fg(Color::White));
 
         f.render_widget(list, area);
+    }
+
+    /// Create a progress bar string for the given percentage
+    fn create_progress_bar(percent: u32) -> String {
+        let filled = (percent / 2) as usize;
+        let empty = PROGRESS_BAR_WIDTH - filled;
+        format!("{}{}", "█".repeat(filled), "░".repeat(empty))
     }
 
     fn render_disks(&self, f: &mut Frame, area: ratatui::layout::Rect) {
@@ -344,9 +352,8 @@ impl App {
                 SystemInfo::format_bytes(disk.available_space)
             ));
             items.push(format!(
-                "Usage Bar:  [{}{}]",
-                "█".repeat((usage_percent / 2) as usize),
-                "░".repeat(50 - (usage_percent / 2) as usize)
+                "Usage Bar:  [{}]",
+                Self::create_progress_bar(usage_percent)
             ));
             items.push(String::new());
         }

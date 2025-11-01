@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
-use sysinfo::{Components, Disks, Networks, System};
+use sysinfo::{Disks, Networks, System};
+
+/// Bytes per kilobyte/megabyte/etc unit
+const BYTES_PER_UNIT: f64 = 1024.0;
 
 /// System information model
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,7 +47,6 @@ impl SystemInfo {
         // Refresh system information
         sys.refresh_all();
 
-        let _components = Components::new_with_refreshed_list();
         let disks = Disks::new_with_refreshed_list();
         let networks = Networks::new_with_refreshed_list();
 
@@ -112,8 +114,8 @@ impl SystemInfo {
         let mut size = bytes as f64;
         let mut unit_index = 0;
 
-        while size >= 1024.0 && unit_index < UNITS.len() - 1 {
-            size /= 1024.0;
+        while size >= BYTES_PER_UNIT && unit_index < UNITS.len() - 1 {
+            size /= BYTES_PER_UNIT;
             unit_index += 1;
         }
 
