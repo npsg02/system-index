@@ -1,15 +1,18 @@
-# Template Rust
+# System Index
 
-A Rust project template featuring a todo application with SQLite database and terminal user interface (TUI).
+A comprehensive CLI and TUI tool for displaying system information, written in Rust.
 
 ## Features
 
-- 📝 Todo management with SQLite persistence
-- 🖥️ Interactive Terminal User Interface (TUI)
-- 🔧 Command Line Interface (CLI)
+- 🖥️ Interactive Terminal User Interface (TUI) with multiple views
+- 🔧 Command Line Interface (CLI) for quick information retrieval
+- 💾 Memory and swap usage monitoring
+- 💿 Disk space and filesystem information
+- 🌐 Network interface statistics
+- ⚙️ CPU and system details
 - 🧪 Comprehensive test suite
 - 🚀 CI/CD with GitHub Actions
-- 📦 Cross-platform releases
+- 📦 Cross-platform releases (Linux, macOS, Windows)
 - 🔒 Security auditing
 
 ## Installation
@@ -17,14 +20,14 @@ A Rust project template featuring a todo application with SQLite database and te
 ### From Source
 
 ```bash
-git clone https://github.com/pnstack/template-rust.git
-cd template-rust
+git clone https://github.com/npsg02/system-index.git
+cd system-index
 cargo build --release
 ```
 
 ### From Releases
 
-Download the latest binary from the [Releases](https://github.com/pnstack/template-rust/releases) page.
+Download the latest binary from the [Releases](https://github.com/npsg02/system-index/releases) page.
 
 ## Usage
 
@@ -32,28 +35,28 @@ Download the latest binary from the [Releases](https://github.com/pnstack/templa
 
 ```bash
 # Show help
-./template-rust --help
+./system-index --help
 
-# Add a new todo
-./template-rust add "Buy groceries" --description "Milk, eggs, bread"
+# Display system overview (default)
+./system-index overview
 
-# List all todos
-./template-rust list
+# Display CPU information
+./system-index cpu
 
-# List only completed todos
-./template-rust list --completed
+# Display memory information
+./system-index memory
 
-# List only pending todos
-./template-rust list --pending
+# Display disk information
+./system-index disks
 
-# Complete a todo (use the ID from list command)
-./template-rust complete <todo-id>
+# Display network information
+./system-index network
 
-# Delete a todo
-./template-rust delete <todo-id>
+# Display all system information
+./system-index all
 
-# Start interactive TUI (default mode)
-./template-rust tui
+# Start interactive TUI
+./system-index tui
 ```
 
 ### Terminal User Interface (TUI)
@@ -61,29 +64,35 @@ Download the latest binary from the [Releases](https://github.com/pnstack/templa
 Start the interactive mode:
 
 ```bash
-./template-rust tui
+./system-index tui
+# or simply
+./system-index
 ```
 
 #### TUI Commands:
 - `h` - Show help
-- `n` - Add new todo
-- `d` - Delete selected todo
-- `c` - Toggle todo completion status
-- `a` - Show all todos
-- `p` - Show pending todos only
-- `f` - Show completed todos only
-- `↑↓` - Navigate todos
+- `r` - Refresh system information
+- `1` - Show system overview
+- `2` - Show memory details
+- `3` - Show disk information
+- `4` - Show network information
 - `q` - Quit application
+
+#### TUI Features:
+- **Overview Tab**: Displays hostname, OS, kernel, uptime, CPU, memory, and summary statistics
+- **Memory Tab**: Shows detailed RAM and swap usage with visual bars
+- **Disks Tab**: Lists all mounted disks with capacity and usage information
+- **Network Tab**: Displays network interfaces with data transfer statistics
+- **Auto-refresh**: System information automatically updates every 2 seconds
 
 ## Project Structure
 
 ```
-template-rust/
+system-index/
 ├── .github/workflows/    # CI/CD workflows
 ├── src/
-│   ├── database/         # Database layer
-│   ├── models/           # Data models
-│   ├── tui/              # Terminal UI
+│   ├── models/           # Data models (SystemInfo)
+│   ├── tui/              # Terminal UI implementation
 │   ├── lib.rs            # Library root
 │   └── main.rs           # CLI application
 ├── tests/                # Integration tests
@@ -96,7 +105,6 @@ template-rust/
 ### Prerequisites
 
 - Rust 1.70 or later
-- SQLite3
 
 ### Building
 
@@ -122,19 +130,17 @@ cargo clippy -- -D warnings
 cargo fmt
 ```
 
-## Database
+## System Information Collected
 
-The application uses SQLite for persistence. By default, it creates a `todo.db` file in the current directory. You can specify a different database path:
+The tool collects and displays:
 
-```bash
-./template-rust --database /path/to/your/todos.db list
-```
-
-For testing with in-memory database:
-
-```bash
-./template-rust --database ":memory:" add "Test todo"
-```
+- **Operating System**: Name, version, kernel version, hostname
+- **CPU**: Brand, number of cores
+- **Memory**: Total RAM, used RAM, free RAM, swap usage
+- **Disks**: All mounted filesystems with capacity and usage
+- **Network**: All network interfaces with received/transmitted data
+- **Processes**: Count of running processes
+- **Uptime**: System uptime in human-readable format
 
 ## CI/CD
 
