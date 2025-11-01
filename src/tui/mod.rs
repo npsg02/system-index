@@ -1,5 +1,4 @@
-use crate::database::TodoDatabase;
-use crate::models::Todo;
+use crate::models::SystemInfo;
 use crate::Result;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
@@ -10,53 +9,47 @@ use ratatui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     Frame, Terminal,
 };
 use std::io;
-use tokio::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Application state
 pub struct App {
-    db: TodoDatabase,
-    todos: Vec<Todo>,
-    selected: ListState,
-    input: String,
-    input_mode: InputMode,
+    system_info: SystemInfo,
+    last_refresh: Instant,
     status_message: String,
-    filter: Filter,
+    current_tab: Tab,
 }
 
-#[derive(Debug, Clone)]
-pub enum InputMode {
-    Normal,
-    Editing,
-}
-
-#[derive(Debug, Clone)]
-pub enum Filter {
-    All,
-    Completed,
-    Pending,
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Tab {
+    Overview,
+    Memory,
+    Disks,
+    Network,
 }
 
 impl App {
-    pub fn new(db: TodoDatabase) -> Self {
-        let mut selected = ListState::default();
-        selected.select(Some(0));
-
+    pub fn new() -> Self {
         Self {
-            db,
-            todos: Vec::new(),
-            selected,
-            input: String::new(),
-            input_mode: InputMode::Normal,
-            status_message: "Welcome to Todo App! Press 'h' for help.".to_string(),
-            filter: Filter::All,
+            system_info: SystemInfo::collect(),
+            last_refresh: Instant::now(),
+            status_message: "Welcome to System Index! Press 'h' for help, 'q' to quit.".to_string(),
+            current_tab: Tab::Overview,
         }
     }
+}
 
-    pub async fn run(&mut self) -> Result<()> {
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl App {
+    pub fn run(&mut self) -> Result<()> {
         // Setup terminal
         enable_raw_mode()?;
         let mut stdout = io::stdout();
@@ -64,7 +57,7 @@ impl App {
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
 
-        let result = self.run_app(&mut terminal).await;
+        let result = self.run_app(&mut terminal);
 
         // Restore terminal
         disable_raw_mode()?;
@@ -78,28 +71,21 @@ impl App {
         result
     }
 
-    async fn run_app<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<()> {
-        self.refresh_todos().await?;
-
+    fn run_app<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<()> {
         loop {
             terminal.draw(|f| self.ui(f))?;
 
+            // Auto-refresh every 2 seconds
+            if self.last_refresh.elapsed() > Duration::from_secs(2) {
+                self.refresh();
+            }
+
             if event::poll(Duration::from_millis(100))? {
                 if let Event::Key(key) = event::read()? {
-                    if key.kind == KeyEventKind::Press {
-                        match self.input_mode {
-                            InputMode::Normal => {
-                                if self.handle_normal_input(key.code).await? {
-                                    break;
-                                }
-                            }
-                            InputMode::Editing => {
-                                if self.handle_editing_input(key.code).await? {
-                                    break;
-                                }
-                            }
+                    if key.kind == KeyEventKind::Press
+                        && self.handle_input(key.code)? {
+                            break;
                         }
-                    }
                 }
             }
         }
@@ -107,139 +93,40 @@ impl App {
         Ok(())
     }
 
-    async fn handle_normal_input(&mut self, key: KeyCode) -> Result<bool> {
+    fn handle_input(&mut self, key: KeyCode) -> Result<bool> {
         match key {
             KeyCode::Char('q') => return Ok(true),
             KeyCode::Char('h') => {
-                self.status_message = "Commands: q=quit, n=new todo, d=delete, c=toggle complete, a=all, p=pending, f=finished, ↑↓=navigate".to_string();
+                self.status_message = "Keys: q=quit, r=refresh, 1=overview, 2=memory, 3=disks, 4=network".to_string();
             }
-            KeyCode::Char('n') => {
-                self.input_mode = InputMode::Editing;
-                self.input.clear();
-                self.status_message = "Enter new todo (ESC to cancel, Enter to save):".to_string();
+            KeyCode::Char('r') => {
+                self.refresh();
+                self.status_message = "System information refreshed!".to_string();
             }
-            KeyCode::Char('d') => {
-                if let Some(index) = self.selected.selected() {
-                    if index < self.todos.len() {
-                        let todo = &self.todos[index];
-                        self.db.delete_todo(&todo.id).await?;
-                        self.refresh_todos().await?;
-                        self.status_message = "Todo deleted!".to_string();
-                    }
-                }
+            KeyCode::Char('1') => {
+                self.current_tab = Tab::Overview;
+                self.status_message = "Showing: Overview".to_string();
             }
-            KeyCode::Char('c') => {
-                if let Some(index) = self.selected.selected() {
-                    if index < self.todos.len() {
-                        let mut todo = self.todos[index].clone();
-                        if todo.completed {
-                            todo.uncomplete();
-                        } else {
-                            todo.complete();
-                        }
-                        self.db.update_todo(&todo).await?;
-                        self.refresh_todos().await?;
-                        self.status_message = if todo.completed {
-                            "Todo marked as completed!".to_string()
-                        } else {
-                            "Todo marked as pending!".to_string()
-                        };
-                    }
-                }
+            KeyCode::Char('2') => {
+                self.current_tab = Tab::Memory;
+                self.status_message = "Showing: Memory".to_string();
             }
-            KeyCode::Char('a') => {
-                self.filter = Filter::All;
-                self.refresh_todos().await?;
-                self.status_message = "Showing all todos".to_string();
+            KeyCode::Char('3') => {
+                self.current_tab = Tab::Disks;
+                self.status_message = "Showing: Disks".to_string();
             }
-            KeyCode::Char('p') => {
-                self.filter = Filter::Pending;
-                self.refresh_todos().await?;
-                self.status_message = "Showing pending todos".to_string();
-            }
-            KeyCode::Char('f') => {
-                self.filter = Filter::Completed;
-                self.refresh_todos().await?;
-                self.status_message = "Showing completed todos".to_string();
-            }
-            KeyCode::Down => {
-                let i = match self.selected.selected() {
-                    Some(i) => {
-                        if i >= self.todos.len().saturating_sub(1) {
-                            0
-                        } else {
-                            i + 1
-                        }
-                    }
-                    None => 0,
-                };
-                self.selected.select(Some(i));
-            }
-            KeyCode::Up => {
-                let i = match self.selected.selected() {
-                    Some(i) => {
-                        if i == 0 {
-                            self.todos.len().saturating_sub(1)
-                        } else {
-                            i - 1
-                        }
-                    }
-                    None => 0,
-                };
-                self.selected.select(Some(i));
+            KeyCode::Char('4') => {
+                self.current_tab = Tab::Network;
+                self.status_message = "Showing: Network".to_string();
             }
             _ => {}
         }
         Ok(false)
     }
 
-    async fn handle_editing_input(&mut self, key: KeyCode) -> Result<bool> {
-        match key {
-            KeyCode::Enter => {
-                if !self.input.is_empty() {
-                    let todo = Todo::new(self.input.trim().to_string(), None);
-                    self.db.create_todo(&todo).await?;
-                    self.input.clear();
-                    self.input_mode = InputMode::Normal;
-                    self.refresh_todos().await?;
-                    self.status_message = "Todo added!".to_string();
-                }
-            }
-            KeyCode::Char(c) => {
-                self.input.push(c);
-            }
-            KeyCode::Backspace => {
-                self.input.pop();
-            }
-            KeyCode::Esc => {
-                self.input.clear();
-                self.input_mode = InputMode::Normal;
-                self.status_message = "Cancelled".to_string();
-            }
-            _ => {}
-        }
-        Ok(false)
-    }
-
-    async fn refresh_todos(&mut self) -> Result<()> {
-        self.todos = match self.filter {
-            Filter::All => self.db.get_all_todos().await?,
-            Filter::Completed => self.db.get_todos_by_status(true).await?,
-            Filter::Pending => self.db.get_todos_by_status(false).await?,
-        };
-
-        // Adjust selection if needed
-        if self.todos.is_empty() {
-            self.selected.select(None);
-        } else if let Some(selected) = self.selected.selected() {
-            if selected >= self.todos.len() {
-                self.selected.select(Some(self.todos.len() - 1));
-            }
-        } else {
-            self.selected.select(Some(0));
-        }
-
-        Ok(())
+    fn refresh(&mut self) {
+        self.system_info = SystemInfo::collect();
+        self.last_refresh = Instant::now();
     }
 
     fn ui(&mut self, f: &mut Frame) {
@@ -253,63 +140,228 @@ impl App {
             ])
             .split(f.size());
 
-        // Title
-        let title = Paragraph::new("📝 Todo App")
-            .style(Style::default().fg(Color::Cyan))
+        // Title with tabs
+        let tab_titles = [
+            ("1: Overview", self.current_tab == Tab::Overview),
+            ("2: Memory", self.current_tab == Tab::Memory),
+            ("3: Disks", self.current_tab == Tab::Disks),
+            ("4: Network", self.current_tab == Tab::Network),
+        ];
+
+        let tabs_text: Vec<String> = tab_titles
+            .iter()
+            .map(|(title, selected)| {
+                if *selected {
+                    format!("[{}]", title)
+                } else {
+                    title.to_string()
+                }
+            })
+            .collect();
+
+        let title = Paragraph::new(format!("🖥️  System Index - {}", tabs_text.join(" | ")))
+            .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
             .alignment(Alignment::Center)
             .block(Block::default().borders(Borders::ALL));
         f.render_widget(title, chunks[0]);
 
-        // Todo list
-        let todos: Vec<ListItem> = self
-            .todos
-            .iter()
-            .map(|todo| {
-                let status = if todo.completed { "✓" } else { "○" };
-                let style = if todo.completed {
-                    Style::default()
-                        .fg(Color::Green)
-                        .add_modifier(Modifier::CROSSED_OUT)
-                } else {
-                    Style::default().fg(Color::White)
-                };
+        // Content based on current tab
+        match self.current_tab {
+            Tab::Overview => self.render_overview(f, chunks[1]),
+            Tab::Memory => self.render_memory(f, chunks[1]),
+            Tab::Disks => self.render_disks(f, chunks[1]),
+            Tab::Network => self.render_network(f, chunks[1]),
+        }
 
-                let content = format!("{} {}", status, todo.title);
-                ListItem::new(content).style(style)
+        // Status bar
+        let status = Paragraph::new(self.status_message.clone())
+            .style(Style::default())
+            .wrap(Wrap { trim: true })
+            .block(Block::default().borders(Borders::ALL).title("Status"));
+        f.render_widget(status, chunks[2]);
+    }
+
+    fn render_overview(&self, f: &mut Frame, area: ratatui::layout::Rect) {
+        let info = &self.system_info;
+        let items = vec![
+            format!("🖥️  Hostname: {}", info.hostname),
+            format!("💻 OS: {} {}", info.os_name, info.os_version),
+            format!("🔧 Kernel: {}", info.kernel_version),
+            format!("⏰ Uptime: {}", SystemInfo::format_uptime(info.uptime)),
+            String::new(),
+            format!("⚙️  CPU: {}", info.cpu_brand),
+            format!("📊 CPU Cores: {}", info.cpu_count),
+            String::new(),
+            format!("💾 Total Memory: {}", SystemInfo::format_bytes(info.total_memory)),
+            format!("📈 Used Memory: {}", SystemInfo::format_bytes(info.used_memory)),
+            format!("📉 Free Memory: {}", SystemInfo::format_bytes(info.total_memory - info.used_memory)),
+            String::new(),
+            format!("🔄 Total Swap: {}", SystemInfo::format_bytes(info.total_swap)),
+            format!("📊 Used Swap: {}", SystemInfo::format_bytes(info.used_swap)),
+            String::new(),
+            format!("💿 Disks: {}", info.disks.len()),
+            format!("🌐 Network Interfaces: {}", info.networks.len()),
+            format!("📋 Running Processes: {}", info.processes_count),
+        ];
+
+        let list_items: Vec<ListItem> = items
+            .iter()
+            .map(|item| ListItem::new(item.as_str()))
+            .collect();
+
+        let list = List::new(list_items)
+            .block(Block::default().borders(Borders::ALL).title("System Overview"))
+            .style(Style::default().fg(Color::White));
+
+        f.render_widget(list, area);
+    }
+
+    fn render_memory(&self, f: &mut Frame, area: ratatui::layout::Rect) {
+        let info = &self.system_info;
+        
+        let total_mem = info.total_memory;
+        let used_mem = info.used_memory;
+        let free_mem = total_mem - used_mem;
+        let mem_usage_percent = if total_mem > 0 {
+            (used_mem as f64 / total_mem as f64 * 100.0) as u32
+        } else {
+            0
+        };
+
+        let total_swap = info.total_swap;
+        let used_swap = info.used_swap;
+        let free_swap = total_swap.saturating_sub(used_swap);
+        let swap_usage_percent = if total_swap > 0 {
+            (used_swap as f64 / total_swap as f64 * 100.0) as u32
+        } else {
+            0
+        };
+
+        let items = vec![
+            "═══ RAM MEMORY ═══".to_string(),
+            format!("Total:     {}", SystemInfo::format_bytes(total_mem)),
+            format!("Used:      {} ({}%)", SystemInfo::format_bytes(used_mem), mem_usage_percent),
+            format!("Free:      {}", SystemInfo::format_bytes(free_mem)),
+            format!("Usage Bar: [{}{}]", 
+                "█".repeat((mem_usage_percent / 2) as usize),
+                "░".repeat(50 - (mem_usage_percent / 2) as usize)
+            ),
+            String::new(),
+            "═══ SWAP MEMORY ═══".to_string(),
+            format!("Total:     {}", SystemInfo::format_bytes(total_swap)),
+            format!("Used:      {} ({}%)", SystemInfo::format_bytes(used_swap), swap_usage_percent),
+            format!("Free:      {}", SystemInfo::format_bytes(free_swap)),
+            format!("Usage Bar: [{}{}]",
+                "█".repeat((swap_usage_percent / 2) as usize),
+                "░".repeat(50 - (swap_usage_percent / 2) as usize)
+            ),
+        ];
+
+        let list_items: Vec<ListItem> = items
+            .iter()
+            .map(|item| {
+                if item.starts_with("═══") {
+                    ListItem::new(item.as_str())
+                        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+                } else {
+                    ListItem::new(item.as_str())
+                }
             })
             .collect();
 
-        let filter_text = match self.filter {
-            Filter::All => "All",
-            Filter::Completed => "Completed",
-            Filter::Pending => "Pending",
-        };
+        let list = List::new(list_items)
+            .block(Block::default().borders(Borders::ALL).title("Memory Details"))
+            .style(Style::default().fg(Color::White));
 
-        let todos_list = List::new(todos)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(format!("Todos ({})", filter_text)),
-            )
-            .highlight_style(Style::default().bg(Color::DarkGray))
-            .highlight_symbol(">> ");
+        f.render_widget(list, area);
+    }
 
-        f.render_stateful_widget(todos_list, chunks[1], &mut self.selected);
+    fn render_disks(&self, f: &mut Frame, area: ratatui::layout::Rect) {
+        let info = &self.system_info;
+        
+        let mut items = vec!["Mounted Disks:".to_string(), String::new()];
+        
+        for (idx, disk) in info.disks.iter().enumerate() {
+            let used_space = disk.total_space - disk.available_space;
+            let usage_percent = if disk.total_space > 0 {
+                (used_space as f64 / disk.total_space as f64 * 100.0) as u32
+            } else {
+                0
+            };
 
-        // Status/Input bar
-        let status_text = match self.input_mode {
-            InputMode::Normal => self.status_message.clone(),
-            InputMode::Editing => format!("New todo: {}", self.input),
-        };
+            items.push(format!("═══ Disk {} ═══", idx + 1));
+            items.push(format!("Name:       {}", disk.name));
+            items.push(format!("Mount:      {}", disk.mount_point));
+            items.push(format!("Filesystem: {}", disk.file_system));
+            items.push(format!("Total:      {}", SystemInfo::format_bytes(disk.total_space)));
+            items.push(format!("Used:       {} ({}%)", SystemInfo::format_bytes(used_space), usage_percent));
+            items.push(format!("Available:  {}", SystemInfo::format_bytes(disk.available_space)));
+            items.push(format!("Usage Bar:  [{}{}]",
+                "█".repeat((usage_percent / 2) as usize),
+                "░".repeat(50 - (usage_percent / 2) as usize)
+            ));
+            items.push(String::new());
+        }
 
-        let status = Paragraph::new(status_text)
-            .style(match self.input_mode {
-                InputMode::Normal => Style::default(),
-                InputMode::Editing => Style::default().fg(Color::Yellow),
+        if info.disks.is_empty() {
+            items.push("No disks found.".to_string());
+        }
+
+        let list_items: Vec<ListItem> = items
+            .iter()
+            .map(|item| {
+                if item.starts_with("═══") {
+                    ListItem::new(item.as_str())
+                        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+                } else {
+                    ListItem::new(item.as_str())
+                }
             })
-            .wrap(Wrap { trim: true })
-            .block(Block::default().borders(Borders::ALL).title("Status"));
+            .collect();
 
-        f.render_widget(status, chunks[2]);
+        let list = List::new(list_items)
+            .block(Block::default().borders(Borders::ALL).title("Disk Information"))
+            .style(Style::default().fg(Color::White));
+
+        f.render_widget(list, area);
+    }
+
+    fn render_network(&self, f: &mut Frame, area: ratatui::layout::Rect) {
+        let info = &self.system_info;
+        
+        let mut items = vec!["Network Interfaces:".to_string(), String::new()];
+        
+        for (idx, network) in info.networks.iter().enumerate() {
+            items.push(format!("═══ Interface {} ═══", idx + 1));
+            items.push(format!("Name:       {}", network.interface_name));
+            items.push(format!("Received:   {}", SystemInfo::format_bytes(network.received_bytes)));
+            items.push(format!("Transmitted: {}", SystemInfo::format_bytes(network.transmitted_bytes)));
+            items.push(format!("Total:      {}", SystemInfo::format_bytes(
+                network.received_bytes + network.transmitted_bytes
+            )));
+            items.push(String::new());
+        }
+
+        if info.networks.is_empty() {
+            items.push("No network interfaces found.".to_string());
+        }
+
+        let list_items: Vec<ListItem> = items
+            .iter()
+            .map(|item| {
+                if item.starts_with("═══") {
+                    ListItem::new(item.as_str())
+                        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+                } else {
+                    ListItem::new(item.as_str())
+                }
+            })
+            .collect();
+
+        let list = List::new(list_items)
+            .block(Block::default().borders(Borders::ALL).title("Network Information"))
+            .style(Style::default().fg(Color::White));
+
+        f.render_widget(list, area);
     }
 }

@@ -1,108 +1,201 @@
 use clap::{Parser, Subcommand};
-use template_rust::{database::TodoDatabase, models::Todo, tui::App};
+use system_index::{models::SystemInfo, tui::App};
 
-/// A simple todo application with SQLite and TUI
+/// A CLI and TUI tool for displaying system information
 #[derive(Parser)]
-#[command(name = "todo")]
-#[command(about = "A terminal todo application")]
+#[command(name = "system-index")]
+#[command(about = "Display comprehensive system information")]
+#[command(version)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
-
-    /// Database file path
-    #[arg(short, long, default_value = "todo.db")]
-    database: String,
 }
 
 #[derive(Subcommand)]
 enum Commands {
     /// Start the interactive TUI
     Tui,
-    /// List all todos
-    List {
-        /// Show only completed todos
-        #[arg(short, long)]
-        completed: bool,
-        /// Show only pending todos
-        #[arg(short, long)]
-        pending: bool,
-    },
-    /// Add a new todo
-    Add {
-        /// Todo title
-        title: String,
-        /// Optional description
-        #[arg(short, long)]
-        description: Option<String>,
-    },
-    /// Complete a todo by ID
-    Complete {
-        /// Todo ID
-        id: String,
-    },
-    /// Delete a todo by ID
-    Delete {
-        /// Todo ID
-        id: String,
-    },
+    /// Display system overview
+    Overview,
+    /// Display CPU information
+    Cpu,
+    /// Display memory information
+    Memory,
+    /// Display disk information
+    Disks,
+    /// Display network information
+    Network,
+    /// Display all system information
+    All,
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
-
-    let db = TodoDatabase::new(&cli.database).await?;
 
     match cli.command {
         Some(Commands::Tui) | None => {
             // Default to TUI mode
-            let mut app = App::new(db);
-            app.run().await?;
+            let mut app = App::new();
+            app.run()?;
         }
-        Some(Commands::List { completed, pending }) => {
-            let todos = if completed {
-                db.get_todos_by_status(true).await?
-            } else if pending {
-                db.get_todos_by_status(false).await?
-            } else {
-                db.get_all_todos().await?
-            };
-
-            if todos.is_empty() {
-                println!("No todos found.");
-            } else {
-                for todo in todos {
-                    let status = if todo.completed { "✓" } else { "○" };
-                    println!("{} {} - {}", status, todo.title, todo.id);
-                    if let Some(description) = &todo.description {
-                        println!("   {}", description);
-                    }
-                }
-            }
+        Some(Commands::Overview) => {
+            print_overview();
         }
-        Some(Commands::Add { title, description }) => {
-            let todo = Todo::new(title, description);
-            db.create_todo(&todo).await?;
-            println!("Todo added: {}", todo.id);
+        Some(Commands::Cpu) => {
+            print_cpu_info();
         }
-        Some(Commands::Complete { id }) => {
-            if let Some(mut todo) = db.get_todo(&id).await? {
-                todo.complete();
-                db.update_todo(&todo).await?;
-                println!("Todo completed: {}", todo.title);
-            } else {
-                eprintln!("Todo not found: {}", id);
-            }
+        Some(Commands::Memory) => {
+            print_memory_info();
         }
-        Some(Commands::Delete { id }) => {
-            if let Some(todo) = db.get_todo(&id).await? {
-                db.delete_todo(&id).await?;
-                println!("Todo deleted: {}", todo.title);
-            } else {
-                eprintln!("Todo not found: {}", id);
-            }
+        Some(Commands::Disks) => {
+            print_disk_info();
+        }
+        Some(Commands::Network) => {
+            print_network_info();
+        }
+        Some(Commands::All) => {
+            print_all_info();
         }
     }
 
     Ok(())
+}
+
+fn print_overview() {
+    let info = SystemInfo::collect();
+    
+    println!("╔═══════════════════════════════════════════════════════╗");
+    println!("║              SYSTEM OVERVIEW                          ║");
+    println!("╚═══════════════════════════════════════════════════════╝");
+    println!();
+    println!("🖥️  Hostname:        {}", info.hostname);
+    println!("💻 Operating System: {} {}", info.os_name, info.os_version);
+    println!("🔧 Kernel Version:   {}", info.kernel_version);
+    println!("⏰ System Uptime:    {}", SystemInfo::format_uptime(info.uptime));
+    println!();
+    println!("⚙️  CPU:             {}", info.cpu_brand);
+    println!("📊 CPU Cores:        {}", info.cpu_count);
+    println!();
+    println!("💾 Total Memory:     {}", SystemInfo::format_bytes(info.total_memory));
+    println!("📈 Used Memory:      {}", SystemInfo::format_bytes(info.used_memory));
+    println!();
+    println!("💿 Mounted Disks:    {}", info.disks.len());
+    println!("🌐 Network Interfaces: {}", info.networks.len());
+    println!("📋 Running Processes: {}", info.processes_count);
+}
+
+fn print_cpu_info() {
+    let info = SystemInfo::collect();
+    
+    println!("╔═══════════════════════════════════════════════════════╗");
+    println!("║              CPU INFORMATION                          ║");
+    println!("╚═══════════════════════════════════════════════════════╝");
+    println!();
+    println!("⚙️  CPU Brand:       {}", info.cpu_brand);
+    println!("📊 Number of Cores:  {}", info.cpu_count);
+}
+
+fn print_memory_info() {
+    let info = SystemInfo::collect();
+    
+    let total_mem = info.total_memory;
+    let used_mem = info.used_memory;
+    let free_mem = total_mem - used_mem;
+    let mem_usage_percent = if total_mem > 0 {
+        used_mem as f64 / total_mem as f64 * 100.0
+    } else {
+        0.0
+    };
+
+    let total_swap = info.total_swap;
+    let used_swap = info.used_swap;
+    let free_swap = total_swap.saturating_sub(used_swap);
+    let swap_usage_percent = if total_swap > 0 {
+        used_swap as f64 / total_swap as f64 * 100.0
+    } else {
+        0.0
+    };
+
+    println!("╔═══════════════════════════════════════════════════════╗");
+    println!("║              MEMORY INFORMATION                       ║");
+    println!("╚═══════════════════════════════════════════════════════╝");
+    println!();
+    println!("═══ RAM MEMORY ═══");
+    println!("Total Memory:    {}", SystemInfo::format_bytes(total_mem));
+    println!("Used Memory:     {} ({:.2}%)", SystemInfo::format_bytes(used_mem), mem_usage_percent);
+    println!("Free Memory:     {}", SystemInfo::format_bytes(free_mem));
+    println!();
+    println!("═══ SWAP MEMORY ═══");
+    println!("Total Swap:      {}", SystemInfo::format_bytes(total_swap));
+    println!("Used Swap:       {} ({:.2}%)", SystemInfo::format_bytes(used_swap), swap_usage_percent);
+    println!("Free Swap:       {}", SystemInfo::format_bytes(free_swap));
+}
+
+fn print_disk_info() {
+    let info = SystemInfo::collect();
+    
+    println!("╔═══════════════════════════════════════════════════════╗");
+    println!("║              DISK INFORMATION                         ║");
+    println!("╚═══════════════════════════════════════════════════════╝");
+    println!();
+    
+    if info.disks.is_empty() {
+        println!("No disk information available.");
+        return;
+    }
+
+    for (idx, disk) in info.disks.iter().enumerate() {
+        let used_space = disk.total_space - disk.available_space;
+        let usage_percent = if disk.total_space > 0 {
+            used_space as f64 / disk.total_space as f64 * 100.0
+        } else {
+            0.0
+        };
+
+        println!("═══ Disk {} ═══", idx + 1);
+        println!("Name:           {}", disk.name);
+        println!("Mount Point:    {}", disk.mount_point);
+        println!("File System:    {}", disk.file_system);
+        println!("Total Space:    {}", SystemInfo::format_bytes(disk.total_space));
+        println!("Used Space:     {} ({:.2}%)", SystemInfo::format_bytes(used_space), usage_percent);
+        println!("Available Space: {}", SystemInfo::format_bytes(disk.available_space));
+        println!();
+    }
+}
+
+fn print_network_info() {
+    let info = SystemInfo::collect();
+    
+    println!("╔═══════════════════════════════════════════════════════╗");
+    println!("║              NETWORK INFORMATION                      ║");
+    println!("╚═══════════════════════════════════════════════════════╝");
+    println!();
+    
+    if info.networks.is_empty() {
+        println!("No network information available.");
+        return;
+    }
+
+    for (idx, network) in info.networks.iter().enumerate() {
+        println!("═══ Interface {} ═══", idx + 1);
+        println!("Name:           {}", network.interface_name);
+        println!("Received:       {}", SystemInfo::format_bytes(network.received_bytes));
+        println!("Transmitted:    {}", SystemInfo::format_bytes(network.transmitted_bytes));
+        println!("Total:          {}", SystemInfo::format_bytes(
+            network.received_bytes + network.transmitted_bytes
+        ));
+        println!();
+    }
+}
+
+fn print_all_info() {
+    print_overview();
+    println!();
+    print_cpu_info();
+    println!();
+    print_memory_info();
+    println!();
+    print_disk_info();
+    println!();
+    print_network_info();
 }

@@ -1,54 +1,50 @@
-use template_rust::{database::TodoDatabase, models::Todo};
+use system_index::models::SystemInfo;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize database
-    let db = TodoDatabase::new("example.db").await?;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("System Information Example");
+    println!("==========================\n");
 
-    // Create some todos
-    let todo1 = Todo::new(
-        "Learn Rust".to_string(),
-        Some("Study ownership and borrowing".to_string()),
-    );
-    let todo2 = Todo::new("Build a CLI app".to_string(), None);
-    let todo3 = Todo::new(
-        "Write tests".to_string(),
-        Some("Unit and integration tests".to_string()),
-    );
+    // Collect system information
+    let info = SystemInfo::collect();
 
-    // Save todos to database
-    db.create_todo(&todo1).await?;
-    db.create_todo(&todo2).await?;
-    db.create_todo(&todo3).await?;
+    // Display basic information
+    println!("Hostname: {}", info.hostname);
+    println!("OS: {} {}", info.os_name, info.os_version);
+    println!("Kernel: {}", info.kernel_version);
+    println!("Uptime: {}", SystemInfo::format_uptime(info.uptime));
+    println!();
 
-    // List all todos
-    println!("All todos:");
-    let todos = db.get_all_todos().await?;
-    for todo in &todos {
-        let status = if todo.completed { "✓" } else { "○" };
-        println!("  {} {}", status, todo.title);
-        if let Some(description) = &todo.description {
-            println!("    {}", description);
-        }
+    // Display CPU information
+    println!("CPU Information:");
+    println!("  Brand: {}", info.cpu_brand);
+    println!("  Cores: {}", info.cpu_count);
+    println!();
+
+    // Display memory information
+    println!("Memory Information:");
+    println!("  Total RAM: {}", SystemInfo::format_bytes(info.total_memory));
+    println!("  Used RAM: {}", SystemInfo::format_bytes(info.used_memory));
+    println!("  Free RAM: {}", SystemInfo::format_bytes(info.total_memory - info.used_memory));
+    println!();
+
+    // Display disk information
+    println!("Disk Information:");
+    for (idx, disk) in info.disks.iter().enumerate() {
+        println!("  Disk {}:", idx + 1);
+        println!("    Name: {}", disk.name);
+        println!("    Mount: {}", disk.mount_point);
+        println!("    Total: {}", SystemInfo::format_bytes(disk.total_space));
+        println!("    Available: {}", SystemInfo::format_bytes(disk.available_space));
     }
+    println!();
 
-    // Complete the first todo
-    let mut todo = todos[0].clone();
-    todo.complete();
-    db.update_todo(&todo).await?;
-
-    println!("\nAfter completing first todo:");
-    let updated_todos = db.get_all_todos().await?;
-    for todo in &updated_todos {
-        let status = if todo.completed { "✓" } else { "○" };
-        println!("  {} {}", status, todo.title);
-    }
-
-    // Get only pending todos
-    println!("\nPending todos:");
-    let pending_todos = db.get_todos_by_status(false).await?;
-    for todo in &pending_todos {
-        println!("  ○ {}", todo.title);
+    // Display network information
+    println!("Network Information:");
+    for (idx, network) in info.networks.iter().enumerate() {
+        println!("  Interface {}:", idx + 1);
+        println!("    Name: {}", network.interface_name);
+        println!("    Received: {}", SystemInfo::format_bytes(network.received_bytes));
+        println!("    Transmitted: {}", SystemInfo::format_bytes(network.transmitted_bytes));
     }
 
     Ok(())
