@@ -19,6 +19,7 @@ pub struct SystemInfo {
     pub used_swap: u64,
     pub disks: Vec<DiskInfo>,
     pub networks: Vec<NetworkInfo>,
+    pub network_details: NetworkDetails,
     pub processes_count: usize,
     pub uptime: u64,
 }
@@ -37,6 +38,14 @@ pub struct NetworkInfo {
     pub interface_name: String,
     pub received_bytes: u64,
     pub transmitted_bytes: u64,
+    pub ip_address: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NetworkDetails {
+    pub local_ip: Option<String>,
+    pub public_ip: Option<String>,
+    pub bandwidth_mbps: Option<f64>,
 }
 
 impl SystemInfo {
@@ -84,11 +93,18 @@ impl SystemInfo {
                 interface_name: interface_name.clone(),
                 received_bytes: data.received(),
                 transmitted_bytes: data.transmitted(),
+                ip_address: None, // Interface-specific IPs not provided by sysinfo crate
             })
             .collect();
 
         let processes_count = sys.processes().len();
         let uptime = System::uptime();
+
+        let network_details = NetworkDetails {
+            local_ip: Self::get_local_ip(),
+            public_ip: Self::get_public_ip(),
+            bandwidth_mbps: Self::benchmark_bandwidth(),
+        };
 
         Self {
             os_name,
@@ -103,6 +119,7 @@ impl SystemInfo {
             used_swap,
             disks: disk_info,
             networks: network_info,
+            network_details,
             processes_count,
             uptime,
         }
@@ -139,6 +156,71 @@ impl SystemInfo {
             format!("{}s", secs)
         }
     }
+
+    /// Get local IP address
+    pub fn get_local_ip() -> Option<String> {
+        local_ip_address::local_ip().ok().map(|ip| ip.to_string())
+    }
+
+    /// Get public IP address
+    pub fn get_public_ip() -> Option<String> {
+        // Try multiple services for reliability
+        let services = [
+            "https://api.ipify.org",
+            "https://ifconfig.me/ip",
+            "https://icanhazip.com",
+        ];
+
+        for service in &services {
+            if let Ok(response) = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(5))
+                .build()
+                .and_then(|client| client.get(*service).send())
+            {
+                if let Ok(ip) = response.text() {
+                    let ip = ip.trim().to_string();
+                    if !ip.is_empty() {
+                        return Some(ip);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Benchmark network bandwidth
+    pub fn benchmark_bandwidth() -> Option<f64> {
+        // Download a test file from a fast CDN to measure bandwidth
+        let test_urls = [
+            "https://speed.cloudflare.com/__down?bytes=1000000", // ~976 KB test
+        ];
+
+        for url in &test_urls {
+            let start = std::time::Instant::now();
+
+            match reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(10))
+                .build()
+                .and_then(|client| client.get(*url).send())
+            {
+                Ok(response) => {
+                    if let Ok(bytes) = response.bytes() {
+                        let duration = start.elapsed();
+                        let duration_secs = duration.as_secs_f64();
+
+                        if duration_secs > 0.0 {
+                            let bytes_count = bytes.len() as f64;
+                            // Calculate Mbps (megabits per second)
+                            let mbps = (bytes_count * 8.0) / (duration_secs * 1_000_000.0);
+                            return Some(mbps);
+                        }
+                    }
+                }
+                Err(_) => continue,
+            }
+        }
+        None
+    }
 }
 
 #[cfg(test)]
@@ -170,5 +252,27 @@ mod tests {
         assert_eq!(SystemInfo::format_uptime(90), "1m 30s");
         assert_eq!(SystemInfo::format_uptime(3661), "1h 1m 1s");
         assert_eq!(SystemInfo::format_uptime(90061), "1d 1h 1m 1s");
+    }
+
+    #[test]
+    fn test_get_local_ip() {
+        // Test that the function doesn't panic
+        let result = SystemInfo::get_local_ip();
+        // Result can be Some or None depending on environment
+        let _ = result;
+    }
+
+    #[test]
+    fn test_network_details_struct() {
+        // Test that we can create a NetworkDetails struct
+        let details = NetworkDetails {
+            local_ip: Some("192.168.1.1".to_string()),
+            public_ip: Some("1.2.3.4".to_string()),
+            bandwidth_mbps: Some(100.0),
+        };
+
+        assert_eq!(details.local_ip, Some("192.168.1.1".to_string()));
+        assert_eq!(details.public_ip, Some("1.2.3.4".to_string()));
+        assert_eq!(details.bandwidth_mbps, Some(100.0));
     }
 }

@@ -90,6 +90,12 @@ fn print_overview() {
     println!();
     println!("💿 Mounted Disks:    {}", info.disks.len());
     println!("🌐 Network Interfaces: {}", info.networks.len());
+    if let Some(local_ip) = &info.network_details.local_ip {
+        println!("🏠 Local IP:         {}", local_ip);
+    }
+    if let Some(public_ip) = &info.network_details.public_ip {
+        println!("🌍 Public IP:        {}", public_ip);
+    }
     println!("📋 Running Processes: {}", info.processes_count);
 }
 
@@ -198,24 +204,46 @@ fn print_network_info() {
     println!("╚═══════════════════════════════════════════════════════╝");
     println!();
 
+    // Display network details (IP and bandwidth)
+    println!("═══ NETWORK DETAILS ═══");
+    if let Some(local_ip) = &info.network_details.local_ip {
+        println!("🏠 Local IP:        {}", local_ip);
+    } else {
+        println!("🏠 Local IP:        Not available");
+    }
+
+    if let Some(public_ip) = &info.network_details.public_ip {
+        println!("🌍 Public IP:       {}", public_ip);
+    } else {
+        println!("🌍 Public IP:       Not available");
+    }
+
+    if let Some(bandwidth) = info.network_details.bandwidth_mbps {
+        println!("⚡ Bandwidth:       {:.2} Mbps", bandwidth);
+    } else {
+        println!("⚡ Bandwidth:       Not available");
+    }
+    println!();
+
+    // Display network interfaces
     if info.networks.is_empty() {
-        println!("No network information available.");
+        println!("No network interfaces available.");
         return;
     }
 
+    println!("═══ NETWORK INTERFACES ═══");
     for (idx, network) in info.networks.iter().enumerate() {
-        println!("═══ Interface {} ═══", idx + 1);
-        println!("Name:           {}", network.interface_name);
+        println!("Interface {}: {}", idx + 1, network.interface_name);
         println!(
-            "Received:       {}",
+            "  Received:       {}",
             SystemInfo::format_bytes(network.received_bytes)
         );
         println!(
-            "Transmitted:    {}",
+            "  Transmitted:    {}",
             SystemInfo::format_bytes(network.transmitted_bytes)
         );
         println!(
-            "Total:          {}",
+            "  Total:          {}",
             SystemInfo::format_bytes(network.received_bytes + network.transmitted_bytes)
         );
         println!();
